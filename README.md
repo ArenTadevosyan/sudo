@@ -91,9 +91,41 @@ python generate_tiny_lm.py \
 
 Что важно: текущий `data/memory.tsv` маленький, поэтому первая модель будет говорить слабо. Нужно наращивать данные через диалоги, `/teach`, `/goal`, `/fact`, `/feedback`, а также добавлять `.txt/.md` тексты в `dataset/raw/`.
 
+## Импорт готовых датасетов
+
+Для роста речи можно подтянуть маленький сэмпл с Hugging Face. Начинай с небольших лимитов, особенно на T4.
+
+Диалоги OpenAssistant на русском:
+
+```bash
+pip install -r requirements.txt
+python tools/import_hf_dataset.py --source oasst_ru --limit 5000
+python tools/export_dataset.py
+```
+
+Русская Wikipedia для общей грамматики и знаний:
+
+```bash
+python tools/import_hf_dataset.py --source wiki_ru --limit 3000
+python tools/export_dataset.py
+```
+
+Русский C4/web corpus лучше брать осторожно и только маленькими порциями:
+
+```bash
+python tools/import_hf_dataset.py --source c4_ru --limit 1000
+python tools/export_dataset.py
+```
+
+После импорта можно обучать как обычно:
+
+```bash
+python train_tiny_lm.py --device cuda --batch-size 16 --block-size 128 --n-layer 4 --n-head 4 --n-embd 256 --steps 3000
+```
+
 ## Следующие сильные шаги
 
-1. Добавить сохранение метрик обучения в `training_log.csv`.
+1. Добавить фильтр качества и дедупликацию для импортированных датасетов.
 2. Подключить обученную модель к `Brain.think()` как генератор ответа.
 3. Сделать планировщик: цель -> шаг -> проверка -> вывод -> новое правило.
 4. Потом перейти от char-level модели к BPE-токенизатору.

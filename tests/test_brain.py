@@ -48,5 +48,25 @@ class BrainTests(unittest.TestCase):
             self.assertIn("Активные цели", brain.learn_report())
 
 
+
+
+class ImportDatasetTests(unittest.TestCase):
+    def test_clean_text_trims_whitespace_and_length(self) -> None:
+        from tools.import_hf_dataset import clean_text
+
+        self.assertEqual(clean_text("  a\n b   c  ", 20), "a b c")
+        self.assertEqual(clean_text("один два три", 9), "один два")
+
+    def test_write_samples_counts_records(self) -> None:
+        from tools.import_hf_dataset import write_samples
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "samples.txt"
+            count = write_samples(path, ["<TASK>dialogue\n<END>", "<TEXT>пример\n<END>"])
+
+            self.assertEqual(count, 2)
+            self.assertIn("<TEXT>пример", path.read_text())
+
+
 if __name__ == "__main__":
     unittest.main()

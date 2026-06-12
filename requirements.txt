@@ -1,4 +1,4 @@
 torch>=2.3
 numpy>=1.26
 tqdm>=4.66
-
+datasets>=2.20
