@@ -33,7 +33,7 @@ def main() -> None:
     model.load_state_dict(state["model"])
     model.eval()
 
-    prompt = args.prompt.encode("utf-8").decode("unicode_escape")
+    prompt = normalize_prompt(args.prompt)
     idx = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=args.device)
     out = model.generate(
         idx,
@@ -45,6 +45,10 @@ def main() -> None:
     if args.stop_at_end and "<END>" in decoded:
         decoded = decoded.split("<END>", 1)[0] + "<END>"
     print(decoded)
+
+
+def normalize_prompt(prompt: str) -> str:
+    return prompt.replace("\\n", "\n")
 
 
 if __name__ == "__main__":

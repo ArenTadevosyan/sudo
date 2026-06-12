@@ -50,6 +50,15 @@ class BrainTests(unittest.TestCase):
 
 
 
+class GenerationTests(unittest.TestCase):
+    def test_normalize_prompt_keeps_cyrillic(self) -> None:
+        from generate_tiny_lm import normalize_prompt
+
+        prompt = normalize_prompt("<USER>как тебя зовут?\\n<ASSISTANT>")
+
+        self.assertEqual(prompt, "<USER>как тебя зовут?\n<ASSISTANT>")
+
+
 class ImportDatasetTests(unittest.TestCase):
     def test_dialogue_mode_filters_non_dialogue(self) -> None:
         from tools.export_dataset import filter_dialogue_samples
