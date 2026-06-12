@@ -51,6 +51,15 @@ class BrainTests(unittest.TestCase):
 
 
 class ImportDatasetTests(unittest.TestCase):
+    def test_raw_imported_blocks_are_split(self) -> None:
+        from tools.export_dataset import split_raw_samples
+
+        raw = "<TASK>dialogue\n<USER>а\n<ASSISTANT>б\n<END>\n\n<TASK>dialogue\n<USER>в\n<ASSISTANT>г\n<END>"
+        samples = split_raw_samples(raw, Path("oasst.txt"))
+
+        self.assertEqual(len(samples), 2)
+        self.assertTrue(samples[0].endswith("<END>"))
+
     def test_clean_text_trims_whitespace_and_length(self) -> None:
         from tools.import_hf_dataset import clean_text
 

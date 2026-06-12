@@ -124,9 +124,24 @@ def read_raw_texts(path: Path) -> list[str]:
         raw = file_path.read_text(encoding="utf-8", errors="ignore").strip()
         if not raw:
             continue
-        samples.append("\n".join([f"<SOURCE>{file_path.relative_to(path)}", "<TEXT>", raw, "<END>"]))
+        samples.extend(split_raw_samples(raw, file_path.relative_to(path)))
     return samples
 
+
+def split_raw_samples(raw: str, source: Path) -> list[str]:
+    if "<END>" not in raw:
+        return ["\n".join([f"<SOURCE>{source}", "<TEXT>", raw, "<END>"])]
+
+    samples: list[str] = []
+    for block in raw.split("<END>"):
+        block = block.strip()
+        if not block:
+            continue
+        if block.startswith("<TASK>") or block.startswith("<KIND>") or block.startswith("<SOURCE>"):
+            samples.append(block + "\n<END>")
+        else:
+            samples.append("\n".join([f"<SOURCE>{source}", block, "<END>"]))
+    return samples
 
 def format_memory(memory: Memory) -> str:
     lines = [
