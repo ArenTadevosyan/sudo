@@ -28,11 +28,14 @@ def main() -> None:
     parser.add_argument("--raw", type=Path, default=DEFAULT_RAW)
     parser.add_argument("--val-ratio", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--mode", choices=["all", "dialogue"], default="all")
     args = parser.parse_args()
 
     memories = read_memories(args.memory)
     samples = build_samples(memories)
     samples.extend(read_raw_texts(args.raw))
+    if args.mode == "dialogue":
+        samples = filter_dialogue_samples(samples)
     if not samples:
         raise SystemExit("No samples exported: memory is empty.")
 
@@ -142,6 +145,15 @@ def split_raw_samples(raw: str, source: Path) -> list[str]:
         else:
             samples.append("\n".join([f"<SOURCE>{source}", block, "<END>"]))
     return samples
+
+
+
+def filter_dialogue_samples(samples: list[str]) -> list[str]:
+    return [
+        sample
+        for sample in samples
+        if sample.startswith("<TASK>dialogue") and "<USER>" in sample and "<ASSISTANT>" in sample
+    ]
 
 def format_memory(memory: Memory) -> str:
     lines = [

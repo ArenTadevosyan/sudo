@@ -18,6 +18,7 @@ def main() -> None:
     parser.add_argument("--max-new-tokens", type=int, default=300)
     parser.add_argument("--temperature", type=float, default=0.9)
     parser.add_argument("--top-k", type=int, default=50)
+    parser.add_argument("--stop-at-end", action="store_true", default=True)
     args = parser.parse_args()
 
     import torch
@@ -32,14 +33,18 @@ def main() -> None:
     model.load_state_dict(state["model"])
     model.eval()
 
-    idx = torch.tensor([tokenizer.encode(args.prompt)], dtype=torch.long, device=args.device)
+    prompt = args.prompt.encode("utf-8").decode("unicode_escape")
+    idx = torch.tensor([tokenizer.encode(prompt)], dtype=torch.long, device=args.device)
     out = model.generate(
         idx,
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
         top_k=args.top_k,
     )
-    print(tokenizer.decode(out[0].tolist()))
+    decoded = tokenizer.decode(out[0].tolist())
+    if args.stop_at_end and "<END>" in decoded:
+        decoded = decoded.split("<END>", 1)[0] + "<END>"
+    print(decoded)
 
 
 if __name__ == "__main__":

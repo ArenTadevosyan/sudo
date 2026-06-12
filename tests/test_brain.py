@@ -51,6 +51,16 @@ class BrainTests(unittest.TestCase):
 
 
 class ImportDatasetTests(unittest.TestCase):
+    def test_dialogue_mode_filters_non_dialogue(self) -> None:
+        from tools.export_dataset import filter_dialogue_samples
+
+        samples = [
+            "<TASK>dialogue\n<USER>а\n<ASSISTANT>б\n<END>",
+            "<KIND>rule\n<TEXT>правило\n<END>",
+        ]
+
+        self.assertEqual(filter_dialogue_samples(samples), [samples[0]])
+
     def test_raw_imported_blocks_are_split(self) -> None:
         from tools.export_dataset import split_raw_samples
 

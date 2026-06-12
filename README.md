@@ -86,7 +86,7 @@ python train_tiny_lm.py \
 ```bash
 python generate_tiny_lm.py \
   --device cuda \
-  --prompt "<USER>как тебя зовут?\n<ASSISTANT>"
+  --prompt $'<USER>как тебя зовут?\n<ASSISTANT>'
 ```
 
 Что важно: текущий `data/memory.tsv` маленький, поэтому первая модель будет говорить слабо. Нужно наращивать данные через диалоги, `/teach`, `/goal`, `/fact`, `/feedback`, а также добавлять `.txt/.md` тексты в `dataset/raw/`.
@@ -121,6 +121,13 @@ python tools/export_dataset.py
 
 ```bash
 python train_tiny_lm.py --device cuda --batch-size 16 --block-size 128 --n-layer 4 --n-head 4 --n-embd 256 --steps 3000
+```
+
+Dialogue-only экспорт для обучения именно ответам, без служебной памяти и Wikipedia:
+
+```bash
+python tools/export_dataset.py --mode dialogue
+python train_tiny_lm.py --device cuda --batch-size 16 --block-size 128 --n-layer 4 --n-head 4 --n-embd 256 --steps 5000
 ```
 
 ## Следующие сильные шаги
