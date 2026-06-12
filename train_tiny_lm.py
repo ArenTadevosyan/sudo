@@ -4,7 +4,7 @@ import argparse
 import time
 from pathlib import Path
 
-from ai_brain.tiny_lm import CharTokenizer, ModelConfig, build_model, save_config
+from ai_brain.tiny_lm import CharTokenizer, ModelConfig, build_model, load_config, save_config
 
 
 ROOT = Path(__file__).resolve().parent
@@ -26,6 +26,8 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--eval-interval", type=int, default=200)
     parser.add_argument("--eval-iters", type=int, default=30)
+    parser.add_argument("--init-from", type=Path, default=None, help="Checkpoint directory to fine-tune from.")
+    parser.add_argument("--init-checkpoint", default="model.pt")
     args = parser.parse_args()
 
     import torch
@@ -33,15 +35,19 @@ def main() -> None:
 
     train_text = args.train.read_text(encoding="utf-8")
     val_text = args.val.read_text(encoding="utf-8") if args.val.exists() else train_text
-    tokenizer = CharTokenizer.train(train_text + val_text)
-    config = ModelConfig(
-        vocab_size=len(tokenizer.chars),
-        block_size=args.block_size,
-        n_layer=args.n_layer,
-        n_head=args.n_head,
-        n_embd=args.n_embd,
-        dropout=args.dropout,
-    )
+    if args.init_from:
+        tokenizer = CharTokenizer.load(args.init_from / "tokenizer.json")
+        config = load_config(args.init_from / "config.json")
+    else:
+        tokenizer = CharTokenizer.train(train_text + val_text)
+        config = ModelConfig(
+            vocab_size=len(tokenizer.chars),
+            block_size=args.block_size,
+            n_layer=args.n_layer,
+            n_head=args.n_head,
+            n_embd=args.n_embd,
+            dropout=args.dropout,
+        )
 
     device = args.device
     if device == "cuda" and not torch.cuda.is_available():
@@ -53,6 +59,10 @@ def main() -> None:
         raise SystemExit("Dataset is too small. Add more memory or lower --block-size.")
 
     model = build_model(config).to(device)
+    if args.init_from:
+        state = torch.load(args.init_from / args.init_checkpoint, map_location=device)
+        model.load_state_dict(state["model"])
+        print(f"initialized from {args.init_from / args.init_checkpoint}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     args.out.mkdir(parents=True, exist_ok=True)
     tokenizer.save(args.out / "tokenizer.json")

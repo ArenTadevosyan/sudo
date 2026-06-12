@@ -60,6 +60,19 @@ class GenerationTests(unittest.TestCase):
 
 
 class ImportDatasetTests(unittest.TestCase):
+    def test_personality_mode_reads_only_identity_seed(self) -> None:
+        from tools.export_dataset import read_raw_texts
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "personality_ru.txt").write_text("<TASK>dialogue\n<USER>кто ты?\n<ASSISTANT>мозг\n<END>")
+            (root / "oasst_ru.txt").write_text("<TASK>dialogue\n<USER>а\n<ASSISTANT>б\n<END>")
+
+            samples = read_raw_texts(root, personality_repeat=2, only_personality=True)
+
+            self.assertEqual(len(samples), 2)
+            self.assertTrue(all("мозг" in sample for sample in samples))
+
     def test_personality_files_are_detected(self) -> None:
         from tools.export_dataset import is_personality_file
 

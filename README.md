@@ -130,6 +130,25 @@ python tools/export_dataset.py --mode dialogue --personality-repeat 30
 python train_tiny_lm.py --device cuda --out checkpoints/dialogue_lm_v2 --batch-size 16 --block-size 128 --n-layer 4 --n-head 4 --n-embd 256 --steps 8000
 ```
 
+Если модель говорит общими фразами, сделай короткий personality fine-tune поверх уже обученного dialogue checkpoint:
+
+```bash
+python tools/export_dataset.py --mode personality --personality-repeat 80
+python train_tiny_lm.py \
+  --device cuda \
+  --init-from checkpoints/dialogue_lm_v2 \
+  --out checkpoints/personality_lm \
+  --batch-size 16 \
+  --lr 1e-4 \
+  --steps 1200
+```
+
+Проверка:
+
+```bash
+python generate_tiny_lm.py --device cuda --checkpoint-dir checkpoints/personality_lm --temperature 0.15 --top-k 4 --prompt $'<USER>как тебя зовут?\n<ASSISTANT>'
+```
+
 ## Следующие сильные шаги
 
 1. Добавить фильтр качества и дедупликацию для импортированных датасетов.
