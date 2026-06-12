@@ -1,0 +1,9 @@
+/target/
+__pycache__/
+*.py[cod]
+/.pytest_cache/
+/data/*.tmp
+/checkpoints/*
+!/checkpoints/.gitkeep
+/dataset/processed/*
+!/dataset/processed/.gitkeep
