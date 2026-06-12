@@ -60,6 +60,13 @@ class GenerationTests(unittest.TestCase):
 
 
 class ImportDatasetTests(unittest.TestCase):
+    def test_personality_files_are_detected(self) -> None:
+        from tools.export_dataset import is_personality_file
+
+        self.assertTrue(is_personality_file(Path("personality_ru.txt")))
+        self.assertTrue(is_personality_file(Path("identity_seed.md")))
+        self.assertFalse(is_personality_file(Path("oasst_ru_5000.txt")))
+
     def test_dialogue_mode_filters_non_dialogue(self) -> None:
         from tools.export_dataset import filter_dialogue_samples
 

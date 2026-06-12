@@ -29,11 +29,12 @@ def main() -> None:
     parser.add_argument("--val-ratio", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--mode", choices=["all", "dialogue"], default="all")
+    parser.add_argument("--personality-repeat", type=int, default=20)
     args = parser.parse_args()
 
     memories = read_memories(args.memory)
     samples = build_samples(memories)
-    samples.extend(read_raw_texts(args.raw))
+    samples.extend(read_raw_texts(args.raw, personality_repeat=args.personality_repeat))
     if args.mode == "dialogue":
         samples = filter_dialogue_samples(samples)
     if not samples:
@@ -117,7 +118,7 @@ def build_samples(memories: list[Memory]) -> list[str]:
     return samples
 
 
-def read_raw_texts(path: Path) -> list[str]:
+def read_raw_texts(path: Path, personality_repeat: int = 20) -> list[str]:
     if not path.exists():
         return []
     samples: list[str] = []
@@ -127,9 +128,15 @@ def read_raw_texts(path: Path) -> list[str]:
         raw = file_path.read_text(encoding="utf-8", errors="ignore").strip()
         if not raw:
             continue
-        samples.extend(split_raw_samples(raw, file_path.relative_to(path)))
+        file_samples = split_raw_samples(raw, file_path.relative_to(path))
+        repeat = personality_repeat if is_personality_file(file_path) else 1
+        samples.extend(file_samples * max(1, repeat))
     return samples
 
+
+def is_personality_file(path: Path) -> bool:
+    name = path.name.lower()
+    return name.startswith("personality") or name.startswith("identity")
 
 def split_raw_samples(raw: str, source: Path) -> list[str]:
     if "<END>" not in raw:
@@ -154,6 +161,7 @@ def filter_dialogue_samples(samples: list[str]) -> list[str]:
         for sample in samples
         if sample.startswith("<TASK>dialogue") and "<USER>" in sample and "<ASSISTANT>" in sample
     ]
+
 
 def format_memory(memory: Memory) -> str:
     lines = [

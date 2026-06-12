@@ -123,11 +123,11 @@ python tools/export_dataset.py
 python train_tiny_lm.py --device cuda --batch-size 16 --block-size 128 --n-layer 4 --n-head 4 --n-embd 256 --steps 3000
 ```
 
-Dialogue-only экспорт для обучения именно ответам, без служебной памяти и Wikipedia:
+Dialogue-only экспорт для обучения именно ответам, без служебной памяти и Wikipedia. Файл `dataset/raw/personality_ru.txt` автоматически усиливается, чтобы модель запомнила личность локального мозга:
 
 ```bash
-python tools/export_dataset.py --mode dialogue
-python train_tiny_lm.py --device cuda --batch-size 16 --block-size 128 --n-layer 4 --n-head 4 --n-embd 256 --steps 5000
+python tools/export_dataset.py --mode dialogue --personality-repeat 30
+python train_tiny_lm.py --device cuda --out checkpoints/dialogue_lm_v2 --batch-size 16 --block-size 128 --n-layer 4 --n-head 4 --n-embd 256 --steps 8000
 ```
 
 ## Следующие сильные шаги
