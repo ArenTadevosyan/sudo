@@ -7,3 +7,7 @@ __pycache__/
 !/checkpoints/.gitkeep
 /dataset/processed/*
 !/dataset/processed/.gitkeep
+/dataset/vision/train/*
+/dataset/vision/val/*
+!/dataset/vision/classes.txt
+.venv/

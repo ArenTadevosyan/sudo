@@ -1,47 +1,41 @@
-from __future__ import annotations
-
 import argparse
 import time
 from pathlib import Path
+import numpy as np
+import torch
+from tqdm import trange
 
-from ai_brain.tiny_lm import CharTokenizer, ModelConfig, build_model, load_config, save_config
-
+from ai_brain.tiny_lm import ModelConfig, build_model, load_config, save_config
 
 ROOT = Path(__file__).resolve().parent
 
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train a tiny character language model from zero.")
-    parser.add_argument("--train", type=Path, default=ROOT / "dataset" / "processed" / "train.txt")
-    parser.add_argument("--val", type=Path, default=ROOT / "dataset" / "processed" / "val.txt")
-    parser.add_argument("--out", type=Path, default=ROOT / "checkpoints" / "tiny_lm")
-    parser.add_argument("--device", default="cuda")
-    parser.add_argument("--steps", type=int, default=3000)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--block-size", type=int, default=256)
-    parser.add_argument("--n-layer", type=int, default=6)
-    parser.add_argument("--n-head", type=int, default=6)
-    parser.add_argument("--n-embd", type=int, default=384)
+    parser = argparse.ArgumentParser(description="Train a powerful coding agent from scratch.")
+    parser.add_argument("--train", type=Path, default=ROOT / "dataset" / "code_data" / "train.bin")
+    parser.add_argument("--val", type=Path, default=ROOT / "dataset" / "code_data" / "val.bin")
+    parser.add_argument("--out", type=Path, default=ROOT / "checkpoints" / "coder_agent")
+    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--steps", type=int, default=5000)
+    parser.add_argument("--batch-size", type=int, default=12) # Reduced for larger vocab/model
+    parser.add_argument("--block-size", type=int, default=512)
+    parser.add_argument("--n-layer", type=int, default=8)
+    parser.add_argument("--n-head", type=int, default=8)
+    parser.add_argument("--n-embd", type=int, default=512)
     parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--lr", type=float, default=3e-4)
-    parser.add_argument("--eval-interval", type=int, default=200)
-    parser.add_argument("--eval-iters", type=int, default=30)
+    parser.add_argument("--lr", type=float, default=6e-4)
+    parser.add_argument("--eval-interval", type=int, default=250)
+    parser.add_argument("--eval-iters", type=int, default=20)
     parser.add_argument("--init-from", type=Path, default=None, help="Checkpoint directory to fine-tune from.")
     parser.add_argument("--init-checkpoint", default="model.pt")
     args = parser.parse_args()
 
-    import torch
-    from tqdm import trange
+    vocab_size = 50304 # GPT-2 vocab padded for multiple of 64
 
-    train_text = args.train.read_text(encoding="utf-8")
-    val_text = args.val.read_text(encoding="utf-8") if args.val.exists() else train_text
     if args.init_from:
-        tokenizer = CharTokenizer.load(args.init_from / "tokenizer.json")
         config = load_config(args.init_from / "config.json")
     else:
-        tokenizer = CharTokenizer.train(train_text + val_text)
         config = ModelConfig(
-            vocab_size=len(tokenizer.chars),
+            vocab_size=vocab_size,
             block_size=args.block_size,
             n_layer=args.n_layer,
             n_head=args.n_head,
@@ -50,34 +44,34 @@ def main() -> None:
         )
 
     device = args.device
-    if device == "cuda" and not torch.cuda.is_available():
-        raise SystemExit("CUDA is not available. Use --device cpu or install CUDA PyTorch.")
 
-    effective_block_size = config.block_size
-    train_data = torch.tensor(tokenizer.encode(train_text), dtype=torch.long)
-    val_data = torch.tensor(tokenizer.encode(val_text), dtype=torch.long)
-    if train_data.numel() <= effective_block_size + 1:
-        raise SystemExit("Dataset is too small. Add more memory or lower --block-size.")
+    train_data = np.memmap(args.train, dtype=np.uint16, mode='r') if args.train.exists() else None
+    val_data = np.memmap(args.val, dtype=np.uint16, mode='r') if args.val.exists() else train_data
+
+    if train_data is None:
+        raise SystemExit(f"Dataset not found at {args.train}. Run prepare_code_data.py first.")
 
     model = build_model(config).to(device)
     if args.init_from:
         state = torch.load(args.init_from / args.init_checkpoint, map_location=device)
         model.load_state_dict(state["model"])
         print(f"initialized from {args.init_from / args.init_checkpoint}")
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+        
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-1, betas=(0.9, 0.95))
     args.out.mkdir(parents=True, exist_ok=True)
-    tokenizer.save(args.out / "tokenizer.json")
     save_config(args.out / "config.json", config)
 
     print(f"vocab={config.vocab_size} block_size={config.block_size} params={count_params(model):,} device={device}")
 
     def get_batch(split: str):
         data = train_data if split == "train" else val_data
-        if data.numel() <= effective_block_size + 1:
-            data = train_data
-        ix = torch.randint(len(data) - effective_block_size - 1, (args.batch_size,))
-        x = torch.stack([data[i : i + effective_block_size] for i in ix]).to(device)
-        y = torch.stack([data[i + 1 : i + effective_block_size + 1] for i in ix]).to(device)
+        ix = torch.randint(len(data) - config.block_size - 1, (args.batch_size,))
+        x = torch.stack([torch.from_numpy((data[i : i + config.block_size]).astype(np.int64)) for i in ix])
+        y = torch.stack([torch.from_numpy((data[i + 1 : i + config.block_size + 1]).astype(np.int64)) for i in ix])
+        if device == "cuda":
+            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
+        else:
+            x, y = x.to(device), y.to(device)
         return x, y
 
     @torch.no_grad()
@@ -101,6 +95,9 @@ def main() -> None:
         _, loss = model(x, y)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
+        
+        # Gradient clipping
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
 
         if step % args.eval_interval == 0 or step == args.steps:
@@ -119,8 +116,6 @@ def count_params(model) -> int:
 
 
 def save_checkpoint(path: Path, model, optimizer, step: int, best_val: float) -> None:
-    import torch
-
     torch.save(
         {
             "model": model.state_dict(),
@@ -134,4 +129,3 @@ def save_checkpoint(path: Path, model, optimizer, step: int, best_val: float) ->
 
 if __name__ == "__main__":
     main()
-

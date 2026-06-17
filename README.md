@@ -156,3 +156,82 @@ python generate_tiny_lm.py --device cuda --checkpoint-dir checkpoints/personalit
 3. Сделать планировщик: цель -> шаг -> проверка -> вывод -> новое правило.
 4. Потом перейти от char-level модели к BPE-токенизатору.
 5. Добавить векторный поиск по памяти.
+
+## Vision: распознавание объектов с нуля
+
+Vision-слой обучает компактный YOLO-подобный детектор без предобученных весов. На T4 16 GB разумная конфигурация: `--img-size 416 --batch-size 16 --amp`. С нуля стартуй с 1–10 классов и нескольких тысяч размеченных кадров, иначе модель не научится. После обучения детекции пишутся в ту же память, что и диалог, поэтому мозг помнит, что видел.
+
+### Архитектура
+
+- `ai_brain/vision/model.py` — Darknet-style backbone (downsample 32x) + одна detection head, выход на сетку 13x13 при 416px.
+- `ai_brain/vision/dataset.py` — YOLO-датасет с letterbox и горизонтальным флипом.
+- `ai_brain/vision/loss.py` — YOLO-loss: box (xy + wh) + objectness + classification, с `lambda_coord=5`, `lambda_noobj=0.5`.
+- `ai_brain/vision/postprocess.py` — декод, NMS, класс `Detection`.
+- `ai_brain/vision/describe.py` — пространственное описание: `слева/справа/центр`, `сверху/середина/снизу`, размер, координаты в пикселях, отношения объектов.
+- `ai_brain/vision/memory_bridge.py` — пишет наблюдения в память (`kind="vision"`), чтобы мозг через `recall` и `think` мог рассказать что видел.
+
+### Подготовка датасета
+
+Каркас:
+
+```bash
+python tools/prepare_vision_dataset.py init --classes person car dog
+```
+
+Структура после init:
+
+```
+dataset/vision/
+  classes.txt
+  train/
+    images/   # сюда положить .jpg/.png
+    labels/   # сюда .txt с YOLO-разметкой: "<class> cx cy w h" (нормализованные)
+  val/
+    images/
+    labels/
+```
+
+Если есть COCO-разметка, конвертируй сразу в нужный формат:
+
+```bash
+python tools/prepare_vision_dataset.py from-coco \
+    --annotations path/to/coco.json \
+    --images path/to/images \
+    --val-fraction 0.1 \
+    --symlink
+```
+
+### Обучение на T4
+
+```bash
+python train_vision.py \
+    --device cuda \
+    --img-size 416 \
+    --batch-size 16 \
+    --epochs 80 \
+    --amp
+```
+
+Если упирается в память — `--img-size 320 --batch-size 8`. Для очень маленького датасета (<1000 картинок) уменьши `--epochs` до 30–40 и поглядывай на `val_loss`, чтобы не уйти в overfit.
+
+### Распознавание и запись в память
+
+```bash
+python detect_vision.py --image path/to.jpg
+python detect_vision.py --image path/to.jpg --remember
+python detect_vision.py --folder path/to/dir --conf 0.3 --remember
+```
+
+Каждое распознавание печатает строки вида:
+
+```
+person (87%): сверху слева, средний размер 142x231px, bbox x=12 y=8 w=142 h=231, центр (0.20, 0.30)
+```
+
+С флагом `--remember` это попадает в `data/memory.tsv` как `kind="vision"`, и потом `Brain.think("что ты видел?")` поднимает наблюдения через `recall`.
+
+### Что важно знать про обучение с нуля
+
+- На T4 разумно учить детектор на 1–20 своих классах. Полный COCO с нуля будет учиться днями и без предобучения недотянет.
+- Качество растёт от количества размеченных кадров. <500 — игрушка, 2k–10k — рабочая точность на узкой задаче.
+- Анкоры в `model.py` подобраны под 13x13. Если средний размер объектов сильно отличается, пересчитай анкоры по своему датасету (k-means на ширине/высоте боксов).

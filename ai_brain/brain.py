@@ -170,6 +170,17 @@ class Brain:
         lowered = user_text.lower()
         if any(word in lowered for word in ["кто ты", "что ты", "identity"]):
             answer = self.identity
+        elif any(word in lowered for word in ["видел", "виже", "вижу", "распозн", "объект", "объектов", "сцена", "сцене", "картинк", "изображ", "фото"]):
+            vision = self.recall(user_text, limit=5, kind="vision")
+            if not vision:
+                answer = (
+                    "Я пока ничего не видел. Запусти "
+                    "python detect_vision.py --image PATH --remember "
+                    "и я смогу рассказать про объекты, координаты и расположение."
+                )
+            else:
+                top = "\n".join(f"- {item.text}" for item in vision[:3])
+                answer = f"Что я видел недавно по этой теме:\n{top}"
         elif any(word in lowered for word in ["план", "сделай", "создай", "развивай"]):
             answer = (
                 f"{context} {rule_hint}{goal_hint}"
@@ -248,15 +259,27 @@ class Brain:
         return f"#{item.memory_id} {item.kind} strength={item.strength:.2f}: {item.text}"
 
     def _core(self, args: list[str]) -> str:
-        command = [
-            "cargo",
-            "run",
-            "--quiet",
-            "--manifest-path",
-            str(CORE_MANIFEST),
-            "--",
-            *args,
-        ]
+        binary_path = ROOT / "rust" / "target" / "release" / "brain_core"
+        if not binary_path.exists():
+            binary_path = ROOT / "target" / "release" / "brain_core"
+            if not binary_path.exists():
+                # Fallback to cargo run if not built
+                command = [
+                    "cargo",
+                    "run",
+                    "--release",
+                    "--quiet",
+                    "--manifest-path",
+                    str(CORE_MANIFEST),
+                    "--",
+                    *args,
+                ]
+                return self._run_command(command)
+        
+        command = [str(binary_path), *args]
+        return self._run_command(command)
+
+    def _run_command(self, command: list[str]) -> str:
         completed = subprocess.run(
             command,
             cwd=ROOT,

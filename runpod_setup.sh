@@ -20,4 +20,5 @@ cargo test
 python -m unittest discover -s tests
 python tools/export_dataset.py
 
-echo "Ready. Train with: python train_tiny_lm.py --device cuda"
+echo "Language model: python train_tiny_lm.py --device cuda"
+echo "Vision detector: python tools/prepare_vision_dataset.py init --classes person car && python train_vision.py --device cuda --amp"
