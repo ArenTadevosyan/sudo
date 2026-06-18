@@ -41,6 +41,7 @@ def main():
     print("  /goal <text>   - Set a long-term goal for the agent")
     print("  /rule <text>   - Add a rule to the agent's memory")
     print("  /feedback <+/-> <reason> - Give feedback on the last action")
+    print("  /clear         - Clear all memory (if Russian text confuses the model)")
     print("  <any prompt>   - Ask the agent to write code")
     
     while True:
@@ -65,6 +66,15 @@ def main():
                 rating = parts[0]
                 note = parts[1] if len(parts) > 1 else ""
                 print("[Agent Memory]>", brain.feedback(rating, note))
+                continue
+                
+            if user_input == "/clear":
+                # Clear the memory file
+                mem_file = Path("data/processed/memory.tsv")
+                if mem_file.exists():
+                    mem_file.unlink()
+                print("[Agent Memory]> Memory wiped! Russian rules removed.")
+                brain = Brain() # re-init
                 continue
             
             # --- Brain Processing Phase ---
