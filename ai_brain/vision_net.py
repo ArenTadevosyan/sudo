@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from .custom_cpp_ops import FastSwish
 
 class RotationSolverNet(nn.Module):
     def __init__(self):
@@ -7,15 +8,15 @@ class RotationSolverNet(nn.Module):
         # Сверточная нейросеть (CNN) для обработки картинок (капчи) 32x32
         self.features = nn.Sequential(
             nn.Conv2d(3, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
+            FastSwish(), # Используем нашу C++ функцию активации!
             nn.MaxPool2d(2), # Картинка уменьшается до 16x16
             
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
+            FastSwish(),
             nn.MaxPool2d(2), # Картинка уменьшается до 8x8
             
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
-            nn.ReLU(),
+            FastSwish(),
             nn.MaxPool2d(2), # Картинка уменьшается до 4x4
         )
         
