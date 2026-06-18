@@ -11,3 +11,4 @@ __pycache__/
 /dataset/vision/val/*
 !/dataset/vision/classes.txt
 .venv/
+*.pt
